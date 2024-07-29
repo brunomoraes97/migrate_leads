@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Lead Submission Form</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+        #formContainer {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+        }
+        input[type="text"],
+        input[type="file"] {
+            width: 100%;
+            padding: 8px;
+            margin-bottom: 20px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        input[type="submit"] {
+            width: 100%;
+            padding: 10px;
+            background-color: #28a745;
+            border: none;
+            border-radius: 4px;
+            color: #fff;
+            font-size: 16px;
+            cursor: pointer;
+        }
+        input[type="submit"]:hover {
+            background-color: #218838;
+        }
+    </style>
+</head>
+<body>
+    <div id="formContainer">
+        <h1>Submit Leads</h1>
+        <form id="leadForm">
+            <label for="url">API URL:</label>
+            <input type="text" id="url" name="url" required>
+            <label for="authToken">Auth Token:</label>
+            <input type="text" id="authToken" name="authToken" required>
+            <label for="file">CSV File:</label>
+            <input type="file" id="file" name="file" accept=".csv" required>
+            <input type="submit" value="Submit">
+        </form>
+        <p id="responseMessage"></p>
+    </div>
+    <script>
+        document.getElementById('leadForm').addEventListener('submit', async function(event) {
+            event.preventDefault();
+
+            const url = document.getElementById('url').value;
+            const authToken = document.getElementById('authToken').value;
+            const file = document.getElementById('file').files[0];
+
+            if (!file) {
+                document.getElementById('responseMessage').textContent = 'Please upload a CSV file.';
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = async function(e) {
+                const csvContent = e.target.result;
+                const leads = csvContent.split('\n').slice(1).map(row => {
+                    const columns = row.split(',');
+                    return {
+                        ip: columns[0],
+                        phone: columns[1],
+                        password: columns[2],
+                        firstname: columns[3],
+                        lastname: columns[4],
+                        email: columns[5],
+                        offer_id: columns[6],
+                        affiliate_id: columns[7]
+                    };
+                });
+
+                for (const lead of leads) {
+                    const countryCode = lead.phone.split(lead.phone[3])[0].replace("+", "");
+                    const iso2Code = new Intl.DisplayNames(['en'], { type: 'region' }).of(countryCode);
+
+                    const payload = {
+                        ip: lead.ip,
+                        country_code: iso2Code,
+                        password: lead.password,
+                        phone: lead.phone,
+                        first_name: lead.firstname,
+                        last_name: lead.lastname,
+                        email: lead.email,
+                        offer_id: lead.offer_id,
+                        affiliate_id: lead.affiliate_id
+                    };
+
+                    try {
+                        const response = await fetch(url, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Accept': 'application/json',
+                                'Authorization': authToken
+                            },
+                            body: JSON.stringify(payload)
+                        });
+
+                        if (!response.ok) {
+                            throw new Error(`Status: ${response.status} / Response: ${response.statusText}`);
+                        }
+                    } catch (error) {
+                        document.getElementById('responseMessage').textContent = `Something off, please check: ${error.message}`;
+                        return;
+                    }
+                }
+
+                document.getElementById('responseMessage').textContent = 'Leads submitted successfully!';
+            };
+            reader.readAsText(file);
+        });
+    </script>
+</body>
+</html>
